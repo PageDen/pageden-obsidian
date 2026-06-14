@@ -10,6 +10,7 @@ import {
   WorkspaceLeaf,
   normalizePath,
 } from "obsidian";
+import type { SettingDefinitionItem } from "obsidian";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -180,7 +181,7 @@ export default class PagedenPlugin extends Plugin {
       return;
     }
     const minutes = Math.max(1, Math.floor(Number(this.settings.autoSyncIntervalMinutes)) || DEFAULT_SETTINGS.autoSyncIntervalMinutes);
-    this.syncIntervalId = window.setInterval(() => void this.syncRunner.run(), minutes * 60_000);
+    this.syncIntervalId = activeWindow.setInterval(() => void this.syncRunner.run(), minutes * 60_000);
     this.registerInterval(this.syncIntervalId);
     if (this.isConfigured()) void this.syncRunner.run();
     else this.setStatus("Pageden: not connected");
@@ -188,7 +189,7 @@ export default class PagedenPlugin extends Plugin {
 
   private stopAutoSync(): void {
     if (this.syncIntervalId !== undefined) {
-      window.clearInterval(this.syncIntervalId);
+      activeWindow.clearInterval(this.syncIntervalId);
       this.syncIntervalId = undefined;
     }
     this.pushDebouncer?.cancelAll();
@@ -269,7 +270,7 @@ export default class PagedenPlugin extends Plugin {
         try {
           await base.write(path, content);
         } finally {
-          window.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
+          activeWindow.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
         }
       },
       writeBinary: base.writeBinary
@@ -278,7 +279,7 @@ export default class PagedenPlugin extends Plugin {
             try {
               await base.writeBinary?.(path, content);
             } finally {
-              window.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
+              activeWindow.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
             }
           }
         : undefined,
@@ -411,8 +412,9 @@ export default class PagedenPlugin extends Plugin {
       try {
         const me = await new PagedenApiClient(this.settings.serverUrl, result.token).me();
         this.settings.userName = me.user.name;
-        if (me.workspaces.length === 1) {
-          const ws = me.workspaces[0]!;
+        const [onlyWorkspace] = me.workspaces;
+        if (onlyWorkspace && me.workspaces.length === 1) {
+          const ws = onlyWorkspace;
           this.settings.workspaceId = ws.id;
           this.settings.workspaceName = ws.name;
           await this.saveSettings();
@@ -491,6 +493,7 @@ export default class PagedenPlugin extends Plugin {
       workspaceId: this.settings.workspaceId,
       files,
       targetRootName,
+      ignoredRootDirs: [this.app.vault.configDir],
       onProgress,
     });
   }
@@ -609,7 +612,7 @@ export default class PagedenPlugin extends Plugin {
   }
 
   private pluginDir(): string {
-    return this.manifest.dir ?? `.obsidian/plugins/${this.manifest.id}`;
+    return this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
   }
 
   private requireConfigured(): void {
@@ -663,7 +666,7 @@ class LiveDocumentView extends ItemView {
     const toolbar = this.contentEl.createDiv({ cls: "pageden-live-toolbar" });
     const editorEl = this.contentEl.createDiv({ cls: "pageden-live-editor" });
 
-    const remote = await this.plugin.api().document(documentId);
+    const remote = await this.plugin.api().getDocument(documentId);
     if (remote.permission === "viewer") throw new Error("Live editing requires editor or manager permission.");
     this.baseVersion = remote.version ?? "";
     this.lastSavedMarkdown = remote.content;
@@ -738,8 +741,8 @@ class LiveDocumentView extends ItemView {
       this.saveAgain = true;
       return;
     }
-    if (this.saveTimer !== undefined) window.clearTimeout(this.saveTimer);
-    this.saveTimer = window.setTimeout(() => void this.persist(), 1500);
+    if (this.saveTimer !== undefined) activeWindow.clearTimeout(this.saveTimer);
+    this.saveTimer = activeWindow.setTimeout(() => void this.persist(), 1500);
   }
 
   private async persist(): Promise<void> {
@@ -749,7 +752,7 @@ class LiveDocumentView extends ItemView {
       return;
     }
     if (this.saveTimer !== undefined) {
-      window.clearTimeout(this.saveTimer);
+      activeWindow.clearTimeout(this.saveTimer);
       this.saveTimer = undefined;
     }
     const content = htmlToMarkdown(this.editor.getHTML());
@@ -789,7 +792,7 @@ class LiveDocumentView extends ItemView {
 
   private destroyLiveSession(): void {
     if (this.saveTimer !== undefined) {
-      window.clearTimeout(this.saveTimer);
+      activeWindow.clearTimeout(this.saveTimer);
       this.saveTimer = undefined;
     }
     this.editor?.destroy();
@@ -807,8 +810,19 @@ class PagedenSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
-  display(): void {
-    const { containerEl } = this;
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [
+      {
+        name: "Pageden",
+        render: (setting) => {
+          setting.settingEl.empty();
+          this.renderSettings(setting.settingEl);
+        },
+      },
+    ];
+  }
+
+  private renderSettings(containerEl: HTMLElement): void {
     containerEl.empty();
     new Setting(containerEl).setName("Pageden").setHeading();
 
@@ -862,7 +876,7 @@ class PagedenSettingTab extends PluginSettingTab {
             this.plugin.settings.workspaceName = "";
             await this.plugin.saveSettings();
             this.plugin.startAutoSync();
-            this.display();
+            this.update();
           }),
         );
 
@@ -942,7 +956,7 @@ class PagedenSettingTab extends PluginSettingTab {
         new Notice("No workspaces found on this account.");
         return;
       }
-      new WorkspacePickerModal(this.app, this.plugin, me.workspaces, () => this.display()).open();
+      new WorkspacePickerModal(this.app, this.plugin, me.workspaces, () => this.update()).open();
     } catch (error) {
       new Notice(errorMessage(error));
     }
@@ -1153,23 +1167,20 @@ class DeviceLoginModal extends Modal {
     });
     new Setting(contentEl)
       .addButton((button) =>
-        button.setButtonText("Open browser").onClick(() => window.open(this.request.verificationUri)),
-      )
-      .addButton((button) =>
-        button.setButtonText("Copy code").onClick(() => void navigator.clipboard?.writeText(this.request.userCode)),
+        button.setButtonText("Open browser").onClick(() => activeWindow.open(this.request.verificationUri)),
       )
       .addButton((button) =>
         button.setButtonText("Check now").onClick(() => void this.poll()),
       );
     this.statusEl = contentEl.createEl("p", { text: "Waiting for you to approve in the browser…" });
     const intervalMs = Math.max(1, this.request.interval) * 1000;
-    this.intervalId = window.setInterval(() => void this.poll(), intervalMs);
-    window.open(this.request.verificationUri);
+    this.intervalId = activeWindow.setInterval(() => void this.poll(), intervalMs);
+    activeWindow.open(this.request.verificationUri);
   }
 
   onClose(): void {
     if (this.intervalId !== undefined) {
-      window.clearInterval(this.intervalId);
+      activeWindow.clearInterval(this.intervalId);
       this.intervalId = undefined;
     }
   }
@@ -1282,7 +1293,7 @@ function isUnderRemoteDocsFolder(remoteDocsFolder: string, path: string): boolea
 }
 
 function markdownToHtml(markdown: string): string {
-  return marked.parse(markdown, { async: false }) as string;
+  return marked.parse(markdown, { async: false });
 }
 
 function htmlToMarkdown(html: string): string {
