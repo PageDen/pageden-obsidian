@@ -41,7 +41,7 @@ export function createDebouncer(ms: number): {
   function cancel(key: string): void {
     const existing = timers.get(key);
     if (existing !== undefined) {
-      activeWindow.clearTimeout(existing);
+      window.clearTimeout(existing);
       timers.delete(key);
     }
   }
@@ -50,7 +50,7 @@ export function createDebouncer(ms: number): {
       cancel(key);
       timers.set(
         key,
-        activeWindow.setTimeout(() => {
+        window.setTimeout(() => {
           timers.delete(key);
           fn();
         }, ms),
@@ -58,7 +58,7 @@ export function createDebouncer(ms: number): {
     },
     cancel,
     cancelAll(): void {
-      for (const timer of timers.values()) activeWindow.clearTimeout(timer);
+      for (const timer of timers.values()) window.clearTimeout(timer);
       timers.clear();
     },
   };

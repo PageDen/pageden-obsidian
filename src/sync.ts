@@ -17,9 +17,9 @@ export interface MetaStoreLike {
   list(): Promise<ServerMetaEntry[]>;
   getByLocalPath(path: string): Promise<ServerMetaEntry | null>;
   upsert(entry: ServerMetaEntry): Promise<void>;
-  listAttachmentsForDocument?(documentId: string): Promise<ServerMetaAttachmentEntry[]>;
-  upsertAttachment?(entry: ServerMetaAttachmentEntry): Promise<void>;
-  removeAttachment?(attachmentId: string): Promise<void>;
+  listAttachmentsForDocument?: (this: void, documentId: string) => Promise<ServerMetaAttachmentEntry[]>;
+  upsertAttachment?: (this: void, entry: ServerMetaAttachmentEntry) => Promise<void>;
+  removeAttachment?: (this: void, attachmentId: string) => Promise<void>;
 }
 
 export interface SyncDeps {
@@ -542,9 +542,9 @@ function hasAttachmentSupport(deps: SyncDeps): boolean {
       deps.api.deleteAttachment &&
       deps.vault.readBinary &&
       deps.vault.writeBinary &&
-      deps.meta.listAttachmentsForDocument &&
-      deps.meta.upsertAttachment &&
-      deps.meta.removeAttachment,
+      typeof deps.meta.listAttachmentsForDocument === "function" &&
+      typeof deps.meta.upsertAttachment === "function" &&
+      typeof deps.meta.removeAttachment === "function",
   );
 }
 

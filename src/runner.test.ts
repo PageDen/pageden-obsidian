@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createDebouncer, createSyncRunner } from "./runner";
 
 Object.defineProperty(globalThis, "activeWindow", { value: globalThis, configurable: true });
+Object.defineProperty(globalThis, "window", { value: globalThis, configurable: true });
 
 describe("createSyncRunner", () => {
   it("runs one pass at a time and coalesces overlapping triggers into a single follow-up", async () => {

@@ -181,7 +181,7 @@ export default class PagedenPlugin extends Plugin {
       return;
     }
     const minutes = Math.max(1, Math.floor(Number(this.settings.autoSyncIntervalMinutes)) || DEFAULT_SETTINGS.autoSyncIntervalMinutes);
-    this.syncIntervalId = activeWindow.setInterval(() => void this.syncRunner.run(), minutes * 60_000);
+    this.syncIntervalId = window.setInterval(() => void this.syncRunner.run(), minutes * 60_000);
     this.registerInterval(this.syncIntervalId);
     if (this.isConfigured()) void this.syncRunner.run();
     else this.setStatus("Pageden: not connected");
@@ -189,7 +189,7 @@ export default class PagedenPlugin extends Plugin {
 
   private stopAutoSync(): void {
     if (this.syncIntervalId !== undefined) {
-      activeWindow.clearInterval(this.syncIntervalId);
+      window.clearInterval(this.syncIntervalId);
       this.syncIntervalId = undefined;
     }
     this.pushDebouncer?.cancelAll();
@@ -270,7 +270,7 @@ export default class PagedenPlugin extends Plugin {
         try {
           await base.write(path, content);
         } finally {
-          activeWindow.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
+          window.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
         }
       },
       writeBinary: base.writeBinary
@@ -279,7 +279,7 @@ export default class PagedenPlugin extends Plugin {
             try {
               await base.writeBinary?.(path, content);
             } finally {
-              activeWindow.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
+              window.setTimeout(() => this.applyingRemoteWrites.delete(path), REMOTE_WRITE_GUARD_MS);
             }
           }
         : undefined,
@@ -741,8 +741,8 @@ class LiveDocumentView extends ItemView {
       this.saveAgain = true;
       return;
     }
-    if (this.saveTimer !== undefined) activeWindow.clearTimeout(this.saveTimer);
-    this.saveTimer = activeWindow.setTimeout(() => void this.persist(), 1500);
+    if (this.saveTimer !== undefined) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => void this.persist(), 1500);
   }
 
   private async persist(): Promise<void> {
@@ -752,7 +752,7 @@ class LiveDocumentView extends ItemView {
       return;
     }
     if (this.saveTimer !== undefined) {
-      activeWindow.clearTimeout(this.saveTimer);
+      window.clearTimeout(this.saveTimer);
       this.saveTimer = undefined;
     }
     const content = htmlToMarkdown(this.editor.getHTML());
@@ -792,7 +792,7 @@ class LiveDocumentView extends ItemView {
 
   private destroyLiveSession(): void {
     if (this.saveTimer !== undefined) {
-      activeWindow.clearTimeout(this.saveTimer);
+      window.clearTimeout(this.saveTimer);
       this.saveTimer = undefined;
     }
     this.editor?.destroy();
@@ -1174,13 +1174,13 @@ class DeviceLoginModal extends Modal {
       );
     this.statusEl = contentEl.createEl("p", { text: "Waiting for you to approve in the browser…" });
     const intervalMs = Math.max(1, this.request.interval) * 1000;
-    this.intervalId = activeWindow.setInterval(() => void this.poll(), intervalMs);
+    this.intervalId = window.setInterval(() => void this.poll(), intervalMs);
     activeWindow.open(this.request.verificationUri);
   }
 
   onClose(): void {
     if (this.intervalId !== undefined) {
-      activeWindow.clearInterval(this.intervalId);
+      window.clearInterval(this.intervalId);
       this.intervalId = undefined;
     }
   }
