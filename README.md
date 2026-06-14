@@ -1,4 +1,4 @@
-# Pageden for Obsidian
+# Pageden Sync for Obsidian
 
 Connect an Obsidian vault to Pageden, a server-owned Markdown workspace for teams and AI agents.
 Use it to browse remote documents, download folders into your vault, sync local edits back to
@@ -27,8 +27,8 @@ Pageden, and import an existing vault into a workspace.
 ## Setup
 
 1. Open Obsidian settings.
-2. Go to **Community plugins** and enable Pageden.
-3. Open **Pageden** settings.
+2. Go to **Community plugins** and enable Pageden Sync.
+3. Open **Pageden Sync** settings.
 4. Keep the default server URL, or enter your self-hosted Pageden server.
 5. Click **Connect to Pageden** and approve the login in your browser.
 6. Pick the workspace to sync with this vault.
